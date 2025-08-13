@@ -1,7 +1,9 @@
 tensorflow==2.20.0
 keras==3.11.2
-matplotlib==3.10.5
-numpy==2.3.2
-pandas==2.3.1
-streamlit==1.48.1
 adversarial-robustness-toolbox==1.20.1
+streamlit==1.48.1
+matplotlib
+numpy
+pandas
+
+
