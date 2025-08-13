@@ -5,10 +5,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TensorFlow logs
 import streamlit as st
 
 st.title("Effect of different Epsilon on accuracy of Mnist Dataset")
-from keras.datasets import mnist
+
 import tensorflow as tf
-import numpy as np
-import keras
+
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
@@ -100,3 +99,4 @@ def comparephotos(x_test_adv):
 
 
 comparephotos(test_adv)
+
