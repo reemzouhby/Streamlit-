@@ -1,19 +1,7 @@
-# Streamlit UI
-streamlit==1.48.1
-
-# TensorFlow & Keras
-tensorflow==2.20.0
-keras==3.11.2
-
-# Numerical & plotting
-numpy>=2.1.0,<2.4
-matplotlib==3.10.5
-pandas==2.3.1
-
-# Adversarial attacks
-adversarial-robustness-toolbox==1.20.1
-
-# Other dependencies
-scikit-learn==1.5.1
-scipy==1.15.1
-tqdm==4.67.1
+streamlit
+tensorflow-cpu==2.15.0
+numpy==1.24.3
+matplotlib
+pandas
+adversarial-robustness-toolbox
+scikit-learn
