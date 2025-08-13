@@ -9,8 +9,10 @@ from keras.datasets import mnist
 import tensorflow as tf
 import numpy as np
 import keras
-from keras.models import Sequential, Model
-from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import warnings
@@ -94,6 +96,7 @@ def comparephotos(x_test_adv):
 
     # Show plot in Streamlit
     st.pyplot(fig)
+
 
 
 comparephotos(test_adv)
