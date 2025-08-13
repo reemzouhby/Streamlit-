@@ -6,7 +6,7 @@ import streamlit as st
 
 st.title("Effect of different Epsilon on accuracy of Mnist Dataset")
 
-
+import tensorflow as tf 
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
