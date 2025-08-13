@@ -1,10 +1,20 @@
+# Streamlit UI
+streamlit==1.48.1
 
-
+# TensorFlow and Keras (matching protobuf range)
 tensorflow==2.20.0
 keras==3.11.2
+
+# Numerical & plotting
+numpy==1.26.4
+matplotlib==3.10.5
+pandas==2.3.1
+
+# Adversarial attacks
 adversarial-robustness-toolbox==1.20.1
-streamlit==1.48.1
-matplotlib
-numpy
-pandas
+
+# Other dependencies
+scikit-learn==1.4.2
+scipy==1.12.0
+tqdm==4.67.1
 
