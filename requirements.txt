@@ -1,7 +1,17 @@
-streamlit
-tensorflow-cpu==2.15.0
-numpy==1.24.3
-matplotlib
+# Core ML
+tensorflow==2.20.0
+
+# Fix protobuf warning
+protobuf==5.28.3
+
+# Adversarial robustness
+adversarial-robustness-toolbox==1.20.1
+
+# App framework
+streamlit==1.48.1
+
+# Data & plotting
+numpy
 pandas
-adversarial-robustness-toolbox
+matplotlib
 scikit-learn
