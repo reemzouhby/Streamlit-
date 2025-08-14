@@ -106,7 +106,7 @@ def run_fgsm_attack(epsilon):
 
         attack = FastGradientMethod(estimator=classifier, eps=epsilon)
         with st.spinner("Generating adversarial examples..."):
-            x_test_adv = attack.generate(x=test_subset)
+            x_test_adv = attack.generate(x=test_images)
 
         pred_clean = np.argmax(model.predict(test_images, verbose=0), axis=1)
         pred_adv = np.argmax(model.predict(x_test_adv, verbose=0), axis=1)
