@@ -1,224 +1,260 @@
 import os
 # Disable GPU completely before importing TensorFlow
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TensorFlow logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress all TensorFlow logs
 import streamlit as st
 import tensorflow as tf
 import numpy as np
 import keras
-from keras.models import Sequential, Model
+from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
 from keras.datasets import mnist
 import matplotlib.pyplot as plt
-import pandas as pd
 import warnings
 
+# Suppress all warnings
 warnings.filterwarnings('ignore')
+tf.get_logger().setLevel('ERROR')
 
-from art.attacks.evasion import FastGradientMethod
-from art.estimators.classification import KerasClassifier
+# Import ART with error handling
+try:
+    from art.attacks.evasion import FastGradientMethod
+    from art.estimators.classification import KerasClassifier
+    ART_AVAILABLE = True
+except ImportError:
+    st.error("ART library not available. Please install adversarial-robustness-toolbox")
+    ART_AVAILABLE = False
 
-st.title("Effect of different Epsilon on accuracy of MNIST Dataset")
+st.title("FGSM Attack on MNIST Dataset")
+
+if not ART_AVAILABLE:
+    st.stop()
 
 @st.cache_data
 def load_and_preprocess_data():
-  
-    (_, _), (test_images, test_labels) = mnist.load_data()
-    # Normalize and add channel dimension
-    test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
-    return test_images, test_labels
+    """Load and preprocess MNIST test data"""
+    try:
+        (_, _), (test_images, test_labels) = mnist.load_data()
+        # Normalize and add channel dimension
+        test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+        return test_images, test_labels
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None, None
 
 @st.cache_resource
 def create_model():
-    
-    
-    # Load data
-    (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
-    
-    # Normalize pixel values to be between 0 and 1
-    train_images, test_images = train_images / 255.0, test_images / 255.0
-    
-    # Add channel dimension for grayscale images
-    train_images = train_images.reshape((train_images.shape[0], 28, 28, 1))
-    test_images = test_images.reshape((test_images.shape[0], 28, 28, 1))
-    
-    class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-    FULLY_CONNECT_NUM = 128
-    batch_size = 128
-    NUM_CLASSES = len(class_names)
-    
-    # Create model with your architecture
-    model = Sequential()
-    model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), padding='same'))
-    model.add(Conv2D(64, (3, 3), activation='relu', padding='same'))
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Conv2D(64, (3, 3), activation='relu', padding='same'))
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Flatten())
-    model.add(Dense(128, activation='relu'))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(NUM_CLASSES, activation='softmax'))
-    
-    model.compile(optimizer='adam',
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
-                  metrics=['accuracy'])
-    
-    # Train with fewer epochs (3 instead of 10)
-    st.info("Training model on full MNIST dataset... This will take a few minutes.")
-    progress_bar = st.progress(0)
-    
-    class ProgressCallback(keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            progress_bar.progress((epoch + 1) / 3)  # Updated for 3 epochs
-    
-    history = model.fit(train_images, train_labels,
-                       epochs=3,  # Reduced from 10 to 3 epochs
-                       batch_size=128,
-                       validation_data=(test_images, test_labels),
-                       verbose=0,
-                       callbacks=[ProgressCallback()])
-    
-    progress_bar.empty()
-    
-    # Evaluate the model
-    test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
-    st.success(f"Model training completed! Test accuracy: {test_acc*100:.2f}%")
-    
+    """Create and train CNN model"""
+    try:
+        with st.spinner("Loading MNIST data..."):
+            # Load data
+            (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
+            
+            # Normalize and reshape
+            train_images = train_images.astype('float32') / 255.0
+            test_images = test_images.astype('float32') / 255.0
+            train_images = train_images.reshape(-1, 28, 28, 1)
+            test_images = test_images.reshape(-1, 28, 28, 1)
+        
+        st.info("Creating and training model...")
+        
+        # Create model
+        model = Sequential([
+            Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), padding='same'),
+            Conv2D(64, (3, 3), activation='relu', padding='same'),
+            MaxPooling2D((2, 2)),
+            Conv2D(64, (3, 3), activation='relu', padding='same'),
+            MaxPooling2D((2, 2)),
+            Flatten(),
+            Dense(128, activation='relu'),
+            Dense(64, activation='relu'),
+            Dense(10, activation='softmax')
+        ])
+        
+        model.compile(
+            optimizer='adam',
+            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+            metrics=['accuracy']
+        )
+        
+        # Train with progress bar
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        class ProgressCallback(keras.callbacks.Callback):
+            def on_epoch_end(self, epoch, logs=None):
+                progress = (epoch + 1) / 3
+                progress_bar.progress(progress)
+                status_text.text(f"Epoch {epoch + 1}/3 - Loss: {logs.get('loss', 0):.4f} - Acc: {logs.get('accuracy', 0):.4f}")
+        
+        # Train model
+        history = model.fit(
+            train_images, train_labels,
+            epochs=3,
+            batch_size=128,
+            validation_data=(test_images, test_labels),
+            verbose=0,
+            callbacks=[ProgressCallback()]
+        )
+        
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Evaluate model
+        test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
+        st.success(f"✅ Model training completed! Test accuracy: {test_acc*100:.2f}%")
+        
+        return model
+        
+    except Exception as e:
+        st.error(f"Error creating model: {e}")
+        return None
 
-# Load data and model
+# Initialize
+data_load_state = st.text("Loading data and model...")
 test_images, test_labels = load_and_preprocess_data()
+
+if test_images is None:
+    st.stop()
+
 model = create_model()
+data_load_state.text("")
 
-# Create ART KerasClassifier
-classifier = KerasClassifier(model=model, clip_values=(0, 1))
+if model is None:
+    st.stop()
 
-class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+# Create ART classifier
+try:
+    classifier = KerasClassifier(model=model, clip_values=(0, 1))
+except Exception as e:
+    st.error(f"Error creating ART classifier: {e}")
+    st.stop()
 
-def fgsm(epsi):
-    """Perform FGSM attack on full test dataset"""
-    # Use full test dataset
-    test_subset = test_images
-    labels_subset = test_labels
-    
-    # Generate adversarial examples
-    attack = FastGradientMethod(estimator=classifier, eps=epsi)
-    
-    # Process in batches to avoid memory issues
-    batch_size = 1000
-    x_test_adv = []
-    
-    progress_bar = st.progress(0)
-    st.write("Generating adversarial examples...")
-    
-    for i in range(0, len(test_subset), batch_size):
-        batch = test_subset[i:i+batch_size]
-        batch_adv = attack.generate(x=batch)
-        x_test_adv.append(batch_adv)
-        progress_bar.progress((i + batch_size) / len(test_subset))
-    
-    x_test_adv = np.vstack(x_test_adv)
-    progress_bar.empty()
-
-    # Evaluate on clean and adversarial examples
-    st.write("Evaluating model performance...")
-    loss_clean, accuracy_clean = model.evaluate(test_subset, labels_subset, verbose=0)
-    loss_adv, accuracy_adv = model.evaluate(x_test_adv, labels_subset, verbose=0)
-
-    return accuracy_clean, accuracy_adv, x_test_adv, test_subset, labels_subset
-
-# Streamlit interface
-val = st.slider("Enter epsilon for FGSM ATTACK", min_value=0.0, max_value=2.0, step=0.01, value=0.1)
-
-if st.button("Run Attack"):
-    with st.spinner("Running FGSM attack..."):
-        acc_clean, acc_adv, test_adv, test_subset, labels_subset = fgsm(val)
+def run_fgsm_attack(epsilon):
+    """Run FGSM attack with given epsilon"""
+    try:
+        st.info(f"Running FGSM attack with epsilon = {epsilon}")
         
-        st.write(f"**Epsilon:** {val}")
-        st.write(f"**Accuracy on clean:** {acc_clean:.4f}")
-        st.write(f"**Accuracy on adversarial:** {acc_adv:.4f}")
+        # Create attack
+        attack = FastGradientMethod(estimator=classifier, eps=epsilon)
         
-        def comparephotos(x_test_adv, test_subset, labels_subset):
-     
-            st.write("Computing predictions on full dataset...")
-            
-            # Process predictions in batches
-            batch_size = 1000
-            pred_clean = []
-            pred_adv = []
-            
-            for i in range(0, len(test_subset), batch_size):
-                batch_clean = test_subset[i:i+batch_size]
-                batch_adv = x_test_adv[i:i+batch_size]
+        # Use subset for faster processing
+        subset_size = min(1000, len(test_images))  # Use max 1000 samples
+        test_subset = test_images[:subset_size]
+        labels_subset = test_labels[:subset_size]
+        
+        # Generate adversarial examples
+        with st.spinner("Generating adversarial examples..."):
+            x_test_adv = attack.generate(x=test_subset)
+        
+        # Evaluate performance
+        st.info("Evaluating model performance...")
+        
+        # Get predictions
+        pred_clean = np.argmax(model.predict(test_subset, verbose=0), axis=1)
+        pred_adv = np.argmax(model.predict(x_test_adv, verbose=0), axis=1)
+        
+        # Calculate accuracies
+        acc_clean = np.mean(pred_clean == labels_subset)
+        acc_adv = np.mean(pred_adv == labels_subset)
+        
+        return acc_clean, acc_adv, x_test_adv, test_subset, labels_subset, pred_clean, pred_adv
+        
+    except Exception as e:
+        st.error(f"Error running attack: {e}")
+        return None
+
+def display_results(results):
+    """Display attack results"""
+    if results is None:
+        return
+        
+    acc_clean, acc_adv, x_test_adv, test_subset, labels_subset, pred_clean, pred_adv = results
+    
+    # Display metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Clean Accuracy", f"{acc_clean:.3f}", f"{acc_clean*100:.1f}%")
+    with col2:
+        st.metric("Adversarial Accuracy", f"{acc_adv:.3f}", f"{acc_adv*100:.1f}%")
+    with col3:
+        accuracy_drop = (acc_clean - acc_adv) * 100
+        st.metric("Accuracy Drop", f"{accuracy_drop:.1f}%", f"-{accuracy_drop:.1f}%")
+    
+    # Sample comparison
+    st.subheader("Sample Comparison (First 10 Images)")
+    
+    try:
+        fig, axes = plt.subplots(2, 10, figsize=(15, 4))
+        
+        for i in range(10):
+            if i >= len(test_subset):
+                break
                 
-                pred_clean.extend(np.argmax(model.predict(batch_clean, verbose=0), axis=1))
-                pred_adv.extend(np.argmax(model.predict(batch_adv, verbose=0), axis=1))
+            # Clean image
+            axes[0, i].imshow(test_subset[i].reshape(28, 28), cmap="gray")
+            axes[0, i].set_title(
+                f"P:{pred_clean[i]}\nT:{labels_subset[i]}", 
+                color=("green" if pred_clean[i] == labels_subset[i] else "red"),
+                fontsize=8
+            )
+            axes[0, i].axis("off")
             
-            pred_clean = np.array(pred_clean)
-            pred_adv = np.array(pred_adv)
+            # Adversarial image
+            axes[1, i].imshow(x_test_adv[i].reshape(28, 28), cmap="gray")
+            axes[1, i].set_title(
+                f"P:{pred_adv[i]}\nT:{labels_subset[i]}", 
+                color=("green" if pred_adv[i] == labels_subset[i] else "red"),
+                fontsize=8
+            )
+            axes[1, i].axis("off")
+        
+        axes[0, 0].set_ylabel("Clean", fontsize=10, rotation=0, labelpad=20)
+        axes[1, 0].set_ylabel("Adversarial", fontsize=10, rotation=0, labelpad=20)
+        fig.suptitle("Clean vs Adversarial Images", fontsize=14)
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+        
+    except Exception as e:
+        st.error(f"Error creating visualization: {e}")
 
-            # --- Accuracy counts on full dataset ---
-            correct_clean = np.sum(pred_clean == labels_subset)
-            correct_adv = np.sum(pred_adv == labels_subset)
-            total_samples = len(labels_subset)
+# Streamlit UI
+st.subheader("Attack Configuration")
+epsilon = st.slider(
+    "Epsilon (Attack Strength)", 
+    min_value=0.0, 
+    max_value=0.5, 
+    step=0.01, 
+    value=0.1,
+    help="Higher values = stronger attack = lower accuracy"
+)
 
-            st.write(f"📊 **Full Dataset Results (Total: {total_samples} samples)**")
-            st.write(f"✅ Correct predictions (clean): {correct_clean} ({100*correct_clean/total_samples:.2f}%)")
-            st.write(f"⚠️ Correct predictions (adv): {correct_adv} ({100*correct_adv/total_samples:.2f}%)")
-            st.write(f"❌ Wrong predictions (clean): {total_samples - correct_clean} ({100*(total_samples-correct_clean)/total_samples:.2f}%)")
-            st.write(f"❌ Wrong predictions (adv): {total_samples - correct_adv} ({100*(total_samples-correct_adv)/total_samples:.2f}%)")
-            st.write(f"📉 **Accuracy drop**: {100*(correct_clean-correct_adv)/total_samples:.2f}%")
+if st.button("🚀 Run FGSM Attack", type="primary"):
+    results = run_fgsm_attack(epsilon)
+    if results:
+        st.subheader("Attack Results")
+        display_results(results)
 
-            # --- Visual comparison (first 10 samples only for display) ---
-            st.write("**Sample Images Comparison (First 10):**")
-            fig, axes = plt.subplots(2, 10, figsize=(15, 4))
-            for i in range(10):
-                # Clean image
-                axes[0, i].imshow(test_subset[i].reshape(28, 28), cmap="gray")
-                axes[0, i].set_title(
-                    f"C:{pred_clean[i]}\nT:{labels_subset[i]}",
-                    color=("blue" if pred_clean[i] == labels_subset[i] else "red"),
-                    fontsize=8
-                )
-                axes[0, i].axis("off")
-
-                # Adversarial image
-                axes[1, i].imshow(x_test_adv[i].reshape(28, 28), cmap="gray")
-                axes[1, i].set_title(
-                    f"A:{pred_adv[i]}\nT:{labels_subset[i]}",
-                    color=("blue" if pred_adv[i] == labels_subset[i] else "red"),
-                    fontsize=8
-                )
-                axes[1, i].axis("off")
-
-            axes[0, 0].set_ylabel("Clean", fontsize=10)
-            axes[1, 0].set_ylabel("Adversarial", fontsize=10)
-            fig.suptitle("Clean Images vs Adversarial Images (Sample)", fontsize=14)
-            plt.tight_layout()
-
-            # Show plot in Streamlit
-            st.pyplot(fig)
-            
-         
-        comparephotos(test_adv, test_subset, labels_subset)
-
+# Sidebar info
 st.sidebar.markdown("""
-### About
-This app demonstrates the Fast Gradient Sign Method (FGSM) adversarial attack on the **full MNIST dataset** (10,000 test samples).
+### About FGSM Attack
 
-- **Epsilon**: Controls the strength of the attack
-- Higher epsilon = stronger attack = lower accuracy
-- The model trains automatically on the full training dataset (60,000 samples)
-- Results are computed on all 10,000 test samples
-- Uses improved CNN architecture with padding='same'
+The Fast Gradient Sign Method (FGSM) generates adversarial examples by:
+1. Computing gradients of loss w.r.t. input
+2. Taking the sign of gradients  
+3. Adding small perturbation: x' = x + ε × sign(∇loss)
 
-### Performance Note
-- Model training: ~3-5 minutes (3 epochs, one time only, cached)
-- Attack generation: ~2-5 minutes depending on epsilon
-- Full dataset evaluation provides more accurate results
+### Parameters
+- **Epsilon (ε)**: Controls perturbation magnitude
+- Larger ε → stronger attack → lower accuracy
+- ε = 0 → no attack (original accuracy)
 
-### Model Architecture
-- Conv2D layers with 'same' padding
-- Two dense layers (128 and 64 neurons)
-- SparseCategoricalCrossentropy loss (no need to convert labels)
+### Model Info
+- CNN with 3 Conv2D layers + 2 Dense layers
+- Trained for 3 epochs on MNIST
+- Uses CPU only (GPU disabled)
 """)
 
+st.sidebar.markdown("---")
+st.sidebar.markdown("*Built with Streamlit & TensorFlow*")
