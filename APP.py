@@ -31,7 +31,7 @@ if not ART_AVAILABLE:
     st.stop()
 
 # --- Load and preprocess data ---
-@st.cache
+@st.cache_data
 def load_and_preprocess_data():
     try:
         (_, _), (test_images, test_labels) = mnist.load_data()
@@ -42,7 +42,7 @@ def load_and_preprocess_data():
         return None, None
 
 # --- Create model ---
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def create_model():
     try:
         (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
