@@ -161,7 +161,7 @@ def display_results(results):
 val = st.slider("Enter epsilon for FGSM ATTACK", min_value=0.0, max_value=2.0, step=0.01,  help="Higher values = stronger attack = lower accuracy")
 if st.button("🚀 Run FGSM Attack", type="primary"):
     with st.spinner("⏳ Running FGSM attack... Please wait"):
-      results = run_fgsm_attack(epsilon)
+      results = run_fgsm_attack(val)
       if results:
         st.subheader("Attack Results")
         display_results(results)
