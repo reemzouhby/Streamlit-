@@ -18,10 +18,8 @@ warnings.filterwarnings('ignore')
 from art.attacks.evasion import FastGradientMethod
 from art.estimators.classification import KerasClassifier
 
-# Load only test data since we're using a pre-trained model
 (_, _), (test_images, test_labels) = mnist.load_data()
 
-# Process only test data (much smaller memory footprint)
 test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
 
 class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
@@ -152,3 +150,4 @@ for msg in st.session_state.messages:
         st.sidebar.markdown(f"🧑 **You:** {msg['content']}")
     else:
         st.sidebar.markdown(f"🤖 **Bot:** {msg['content']}")
+
