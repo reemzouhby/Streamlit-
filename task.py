@@ -8,6 +8,7 @@ import numpy as np
 import keras
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
+from keras.datasets import mnist
 import matplotlib.pyplot as plt
 import pandas as pd
 import warnings
@@ -22,59 +23,91 @@ st.title("Effect of different Epsilon on accuracy of MNIST Dataset")
 @st.cache_data
 def load_and_preprocess_data():
     """Load and preprocess MNIST data"""
-    from keras.datasets import mnist
     (_, _), (test_images, test_labels) = mnist.load_data()
+    # Normalize and add channel dimension
     test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
     return test_images, test_labels
 
 @st.cache_resource
 def create_model():
-    """Create and train a CNN model on full MNIST dataset"""
-    from keras.datasets import mnist
+    """Create and train a CNN model using your architecture"""
     
-    # Load full training data
+    # Load data
     (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
     
-    # Preprocess data
-    train_images = train_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
-    test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+    # Normalize pixel values to be between 0 and 1
+    train_images, test_images = train_images / 255.0, test_images / 255.0
     
-    # Convert labels to categorical
-    train_labels = keras.utils.to_categorical(train_labels, 10)
-    test_labels = keras.utils.to_categorical(test_labels, 10)
+    # Add channel dimension for grayscale images
+    train_images = train_images.reshape((train_images.shape[0], 28, 28, 1))
+    test_images = test_images.reshape((test_images.shape[0], 28, 28, 1))
     
-    # Create model
-    model = Sequential([
-        Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
-        MaxPooling2D((2, 2)),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D((2, 2)),
-        Conv2D(64, (3, 3), activation='relu'),
-        Flatten(),
-        Dense(64, activation='relu'),
-        Dropout(0.5),
-        Dense(10, activation='softmax')
-    ])
+    class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+    FULLY_CONNECT_NUM = 128
+    batch_size = 128
+    NUM_CLASSES = len(class_names)
+    
+    # Create model with your architecture
+    model = Sequential()
+    model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), padding='same'))
+    model.add(Conv2D(64, (3, 3), activation='relu', padding='same'))
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Conv2D(64, (3, 3), activation='relu', padding='same'))
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Flatten())
+    model.add(Dense(128, activation='relu'))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(NUM_CLASSES, activation='softmax'))
     
     model.compile(optimizer='adam',
-                  loss='categorical_crossentropy',
+                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
                   metrics=['accuracy'])
     
-    # Train on full dataset
-    st.info("Training model on full MNIST dataset... This will take several minutes.")
+    # Train with fewer epochs (3 instead of 10)
+    st.info("Training model on full MNIST dataset... This will take a few minutes.")
     progress_bar = st.progress(0)
     
     class ProgressCallback(keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
-            progress_bar.progress((epoch + 1) / 5)
+            progress_bar.progress((epoch + 1) / 3)  # Updated for 3 epochs
     
-    model.fit(train_images, train_labels, 
-              epochs=5, batch_size=128, verbose=0,
-              validation_data=(test_images, test_labels),
-              callbacks=[ProgressCallback()])
+    history = model.fit(train_images, train_labels,
+                       epochs=3,  # Reduced from 10 to 3 epochs
+                       batch_size=128,
+                       validation_data=(test_images, test_labels),
+                       verbose=0,
+                       callbacks=[ProgressCallback()])
     
     progress_bar.empty()
-    st.success("Model training completed!")
+    
+    # Evaluate the model
+    test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
+    st.success(f"Model training completed! Test accuracy: {test_acc*100:.2f}%")
+    
+    # Display training history
+    with st.expander("Training History"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig1, ax1 = plt.subplots(figsize=(8, 4))
+            ax1.plot(history.history['accuracy'], label='Training Accuracy')
+            ax1.plot(history.history['val_accuracy'], label='Validation Accuracy')
+            ax1.set_xlabel('Epoch')
+            ax1.set_ylabel('Accuracy')
+            ax1.set_ylim([0.5, 1])
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+            st.pyplot(fig1)
+        
+        with col2:
+            fig2, ax2 = plt.subplots(figsize=(8, 4))
+            ax2.plot(history.history['loss'], label='Training Loss')
+            ax2.plot(history.history['val_loss'], label='Validation Loss')
+            ax2.set_xlabel('Epoch')
+            ax2.set_ylabel('Loss')
+            ax2.legend()
+            ax2.grid(True, alpha=0.3)
+            st.pyplot(fig2)
     
     return model
 
@@ -114,12 +147,8 @@ def fgsm(epsi):
 
     # Evaluate on clean and adversarial examples
     st.write("Evaluating model performance...")
-    loss_clean, accuracy_clean = model.evaluate(test_subset, 
-                                               keras.utils.to_categorical(labels_subset, 10), 
-                                               verbose=0)
-    loss_adv, accuracy_adv = model.evaluate(x_test_adv, 
-                                           keras.utils.to_categorical(labels_subset, 10), 
-                                           verbose=0)
+    loss_clean, accuracy_clean = model.evaluate(test_subset, labels_subset, verbose=0)
+    loss_adv, accuracy_adv = model.evaluate(x_test_adv, labels_subset, verbose=0)
 
     return accuracy_clean, accuracy_adv, x_test_adv, test_subset, labels_subset
 
@@ -240,9 +269,15 @@ This app demonstrates the Fast Gradient Sign Method (FGSM) adversarial attack on
 - Higher epsilon = stronger attack = lower accuracy
 - The model trains automatically on the full training dataset (60,000 samples)
 - Results are computed on all 10,000 test samples
+- Uses improved CNN architecture with padding='same'
 
 ### Performance Note
-- Model training: ~5-10 minutes (one time only, cached)
+- Model training: ~3-5 minutes (3 epochs, one time only, cached)
 - Attack generation: ~2-5 minutes depending on epsilon
 - Full dataset evaluation provides more accurate results
+
+### Model Architecture
+- Conv2D layers with 'same' padding
+- Two dense layers (128 and 64 neurons)
+- SparseCategoricalCrossentropy loss (no need to convert labels)
 """)
