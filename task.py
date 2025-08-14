@@ -1,114 +1,154 @@
 import streamlit as st
-import numpy as np
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+st.title("Effect of different Epsilon on accuracy of Mnist Dataset")
+from keras.datasets import mnist
 import tensorflow as tf
-from tensorflow.keras.datasets import mnist
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+import numpy as np
+import keras
+from keras.models import Sequential, Model
+from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
 import matplotlib.pyplot as plt
+import pandas as pd
+import warnings
 
-# =============================
-# 1. Create & Train Model
-# =============================
-def create_model():
-    try:
-        (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
+warnings.filterwarnings('ignore')
 
-        # Normalize and reshape
-        train_images = train_images.astype('float32') / 255.0
-        test_images = test_images.astype('float32') / 255.0
-        train_images = train_images.reshape(-1, 28, 28, 1)
-        test_images = test_images.reshape(-1, 28, 28, 1)
+from art.attacks.evasion import FastGradientMethod
+from art.estimators.classification import KerasClassifier
 
-        model = Sequential([
-            Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), padding='same'),
-            Conv2D(64, (3, 3), activation='relu', padding='same'),
-            MaxPooling2D((2, 2)),
-            Conv2D(64, (3, 3), activation='relu', padding='same'),
-            MaxPooling2D((2, 2)),
-            Flatten(),
-            Dense(128, activation='relu'),
-            Dense(64, activation='relu'),
-            Dense(10, activation='softmax')
-        ])
+# Load only test data since we're using a pre-trained model
+(_, _), (test_images, test_labels) = mnist.load_data()
 
-        model.compile(
-            optimizer='adam',
-            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
-            metrics=['accuracy']
+# Process only test data (much smaller memory footprint)
+test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+
+class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+
+model = tf.keras.models.load_model("Practice/task1/mnist_model.h5")
+# Create ART KerasClassifier
+classifier = KerasClassifier(model=model, clip_values=(0, 1))
+
+
+def fgsm(epsi):
+    # Generate adversarial examples
+    attack = FastGradientMethod(estimator=classifier, eps=epsi)
+    x_test_adv = attack.generate(x=test_images)
+
+    # Evaluate on clean and adversarial examples
+    loss_clean, accuracy_clean = model.evaluate(test_images, test_labels, verbose=0)
+    loss_adv, accuracy_adv = model.evaluate(x_test_adv, test_labels, verbose=0)
+    return accuracy_clean, accuracy_adv, x_test_adv
+
+
+
+
+def comparephotos(x_test_adv):
+
+    pred_clean = np.argmax(model.predict(test_images), axis=1)
+    pred_adv = np.argmax(model.predict(x_test_adv), axis=1)
+
+
+    correct_clean = np.sum(pred_clean == test_labels)
+    correct_adv = np.sum(pred_adv == test_labels)
+
+
+
+    fig, axes = plt.subplots(2, 10, figsize=(15, 4))
+    for i in range(10):
+        # Clean image
+        axes[0, i].imshow(test_images[i].reshape(28, 28), cmap="gray")
+        axes[0, i].set_title(
+            f"C:{pred_clean[i]}\nT:{test_labels[i]}",
+            color=("blue" if pred_clean[i] == test_labels[i] else "red"),
+            fontsize=8
         )
+        axes[0, i].axis("off")
 
-        model.fit(train_images, train_labels, epochs=3, batch_size=128,
-                  validation_data=(test_images, test_labels), verbose=1)
+        # Adversarial image
+        axes[1, i].imshow(x_test_adv[i].reshape(28, 28), cmap="gray")
+        axes[1, i].set_title(
+            f"A:{pred_adv[i]}\nT:{test_labels[i]}",
+            color=("blue" if pred_adv[i] == test_labels[i] else "red"),
+            fontsize=8
+        )
+        axes[1, i].axis("off")
 
-        return model, (test_images, test_labels)
+    axes[0, 0].set_ylabel("Clean", fontsize=10)
+    axes[1, 0].set_ylabel("Adv", fontsize=10)
+    fig.suptitle("Clean Images vs Adversarial Images", fontsize=14)
+    plt.tight_layout()
 
-    except Exception as e:
-        st.error(f"Error creating model: {e}")
-        return None, (None, None)
-
-# =============================
-# 2. FGSM Attack
-# =============================
-def fgsm(model, images, labels, epsilon=0.2):
-    loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
-
-    with tf.GradientTape() as tape:
-        tape.watch(images)
-        prediction = model(images)
-        loss = loss_object(labels, prediction)
-
-    gradient = tape.gradient(loss, images)
-    signed_grad = tf.sign(gradient)
-    adv_images = images + epsilon * signed_grad
-    adv_images = tf.clip_by_value(adv_images, 0, 1)
-
-    return adv_images
-
-# =============================
-# 3. Compare Photos
-# =============================
-def comparephotos(original, adversarial, labels):
-    fig, axes = plt.subplots(2, 5, figsize=(10, 4))
-    for i in range(5):
-        axes[0, i].imshow(original[i].numpy().squeeze(), cmap='gray')
-        axes[0, i].set_title(f"Orig: {labels[i].numpy()}")
-        axes[0, i].axis('off')
-
-        axes[1, i].imshow(adversarial[i].numpy().squeeze(), cmap='gray')
-        axes[1, i].set_title("Adv")
-        axes[1, i].axis('off')
-
+    # Show plot in Streamlit
     st.pyplot(fig)
 
-# =============================
-# Streamlit UI
-# =============================
-st.set_page_config(page_title="MNIST FGSM Demo", layout="wide")
 
-st.title("MNIST Model with FGSM Attack 🧠⚡")
 
-if st.button("Train & Attack Model"):
-    with st.spinner("Training model... please wait"):
-        model, (test_images, test_labels) = create_model()
 
-    if model:
-        idx = np.random.choice(len(test_images), 5)
-        sample_images = tf.convert_to_tensor(test_images[idx])
-        sample_labels = tf.convert_to_tensor(test_labels[idx])
 
-        st.success("Model trained! Running FGSM attack...")
-        adv_images = fgsm(model, sample_images, sample_labels)
+val = st.slider("Enter epsilon for FGSM ATTACK", min_value=0.0, max_value=2.0, step=0.01,  help="Higher values = stronger attack = lower accuracy")
+if st.button("🚀 Run FGSM Attack", type="primary"):
+    with st.spinner("⏳ Running FGSM attack... Please wait"):
+      acc_clean, acc_adv, test_adv = fgsm(val)
+      if (acc_clean, acc_adv, test_adv):
+          col1, col2, col3 = st.columns(3)
+          with col1:
+              st.metric("Clean Accuracy", f"{acc_clean:.3f}", f"{acc_clean * 100:.1f}%")
+          with col2:
+              st.metric("Adversarial Accuracy", f"{acc_adv:.3f}", f"{acc_adv * 100:.1f}%")
+          with col3:
+              accuracy_drop = (acc_clean - acc_adv) * 100
+              st.metric("Accuracy Drop", f"{accuracy_drop:.1f}%", f"-{accuracy_drop:.1f}%")
 
-        st.subheader("Original vs Adversarial Examples")
-        comparephotos(sample_images, adv_images, sample_labels)
+st.sidebar.markdown("""
+### About FGSM Attack
 
-# Sidebar Chat
-st.sidebar.title("💬 Mini Chatbot")
+The Fast Gradient Sign Method (FGSM) generates adversarial examples by:
+1. Computing gradients of loss w.r.t. input
+2. Taking the sign of gradients  
+3. Adding small perturbation: x' = x + ε × sign(∇loss)
+
+### Parameters
+- **Epsilon (ε)**: Controls perturbation magnitude
+- Larger ε → stronger attack → lower accuracy
+- ε = 0 → no attack (original accuracy)
+
+""")
+
+st.sidebar.markdown("---")
+
+# --- Project questions with answers ---
 faq = {
-    "What is FGSM?": "FGSM is a fast gradient sign method used to generate adversarial examples.",
-    "What is MNIST?": "MNIST is a dataset of handwritten digits (0–9) used for training image processing systems."
-}
+    "What is the purpose of FGSM Attack?": "FGSM generates adversarial examples by adding small, calculated noise to fool the model.",
+    "How does the model get affected by epsilon?": "The larger ε is, the stronger the attack, and the lower the accuracy on adversarial examples.",
+    "What is the difference between accuracy on clean and adversarial data?": "Accuracy on clean = model performance on original data, accuracy on adversarial = performance after attack.",
+    }
 
+# --- Initialize chat messages ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# --- Chat interface in sidebar ---
+st.sidebar.title("💬 Mini Chatbot")
+
+# Select a question
 selected_q = st.sidebar.selectbox("📋 Choose a question:", ["", *faq.keys()])
+
 if selected_q:
-    st.sidebar.write(faq[selected_q])
+    st.session_state.messages.append({"role": "user", "content": selected_q})
+    st.session_state.messages.append({"role": "assistant", "content": faq[selected_q]})
+
+
+if st.sidebar.button("Send"):
+
+        st.session_state.messages.append({"role": "user", "content": selected_q})
+
+        st.session_state.messages.append({"role": "assistant", "content": faq[selected_q]})
+
+# Display conversation
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.sidebar.markdown(f"🧑 **You:** {msg['content']}")
+    else:
+        st.sidebar.markdown(f"🤖 **Bot:** {msg['content']}")
