@@ -24,7 +24,7 @@ test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
 
 class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 
-model = tf.keras.models.load_model("Practice/task1/mnist_model.h5")
+model = tf.keras.models.load_model("mnist_model.h5")
 # Create ART KerasClassifier
 classifier = KerasClassifier(model=model, clip_values=(0, 1))
 
@@ -150,4 +150,5 @@ for msg in st.session_state.messages:
         st.sidebar.markdown(f"🧑 **You:** {msg['content']}")
     else:
         st.sidebar.markdown(f"🤖 **Bot:** {msg['content']}")
+
 
