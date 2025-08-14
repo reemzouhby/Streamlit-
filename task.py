@@ -74,7 +74,7 @@ def create_model():
             batch_size=128,
             validation_data=(test_images, test_labels),
             verbose=0,
-            callbacks=[ProgressCallback()]
+         
         )
         
         progress_bar.empty()
@@ -228,3 +228,4 @@ for msg in st.session_state.messages:
         st.sidebar.markdown(f"🧑 **You:** {msg['content']}")
     else:
         st.sidebar.markdown(f"🤖 **Bot:** {msg['content']}")
+
