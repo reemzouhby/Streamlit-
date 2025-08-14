@@ -2,7 +2,9 @@ import streamlit as st
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 st.title("Effect of different Epsilon on accuracy of Mnist Dataset")
+
 from keras.datasets import mnist
 import tensorflow as tf
 import numpy as np
@@ -26,12 +28,68 @@ test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
 
 class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 
-model = tf.keras.models.load_model("mnist_model.h5")
-# Create ART KerasClassifier
-classifier = KerasClassifier(model=model, clip_values=(0, 1))
+# Try to load the model, with error handling
+@st.cache_resource
+def load_model():
+    try:
+        # Try different possible paths for the model
+        model_paths = [
+            "mnist_model.h5",
+            "Practice/task1/mnist_model.h5",
+            "./mnist_model.h5"
+        ]
+        
+        model = None
+        for path in model_paths:
+            try:
+                model = tf.keras.models.load_model(path)
+                st.success(f"Model loaded successfully from: {path}")
+                break
+            except:
+                continue
+        
+        if model is None:
+            st.error("Model file not found. Creating a simple model for demonstration...")
+            # Create a simple model for demonstration if the trained model is not available
+            model = create_simple_model()
+            
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        return create_simple_model()
 
+def create_simple_model():
+    """Create a simple CNN model for MNIST (for demonstration purposes)"""
+    model = Sequential([
+        Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
+        MaxPooling2D((2, 2)),
+        Conv2D(64, (3, 3), activation='relu'),
+        MaxPooling2D((2, 2)),
+        Flatten(),
+        Dense(64, activation='relu'),
+        Dropout(0.2),
+        Dense(10, activation='softmax')
+    ])
+    
+    model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    
+    st.warning("Using untrained model for demonstration. Results may not be meaningful.")
+    return model
+
+# Load the model
+model = load_model()
+
+# Create ART KerasClassifier
+if model:
+    classifier = KerasClassifier(model=model, clip_values=(0, 1))
 
 def fgsm(epsi):
+    if not model:
+        st.error("Model not available!")
+        return None, None, None
+        
     # Generate adversarial examples
     attack = FastGradientMethod(estimator=classifier, eps=epsi)
     x_test_adv = attack.generate(x=test_images)
@@ -42,10 +100,11 @@ def fgsm(epsi):
 
     return accuracy_clean, accuracy_adv, x_test_adv
 
-
-
-
 def comparephotos(x_test_adv):
+    if not model:
+        st.error("Model not available!")
+        return
+        
     # --- Predictions ---
     pred_clean = np.argmax(model.predict(test_images), axis=1)
     pred_adv = np.argmax(model.predict(x_test_adv), axis=1)
@@ -88,21 +147,22 @@ def comparephotos(x_test_adv):
     # Show plot in Streamlit
     st.pyplot(fig)
 
+# Main interface
+if model:
+    val = st.slider("Enter epsilon for FGSM ATTACK", min_value=0.0, max_value=2.0, step=0.01, help="Higher values = stronger attack = lower accuracy")
+    
+    if st.button("🚀 Run FGSM Attack", type="primary"):
+        with st.spinner("⏳ Running FGSM attack... Please wait"):
+            acc_clean, acc_adv, test_adv = fgsm(val)
+            if acc_clean is not None and acc_adv is not None and test_adv is not None:
+                st.write(f"**Epsilon:** {val}")
+                st.write(f"**Accuracy on clean:** {acc_clean:.4f}")
+                st.write(f"**Accuracy on adversarial:** {acc_adv:.4f}")
+                comparephotos(test_adv)
+else:
+    st.error("Cannot proceed without a valid model.")
 
-
-
-
-val = st.slider("Enter epsilon for FGSM ATTACK", min_value=0.0, max_value=2.0, step=0.01,  help="Higher values = stronger attack = lower accuracy")
-if st.button("🚀 Run FGSM Attack", type="primary"):
-    with st.spinner("⏳ Running FGSM attack... Please wait"):
-      acc_clean, acc_adv, test_adv = fgsm(val)
-      if (acc_clean, acc_adv, test_adv ):
-         st.write(f"**Epsilon:** {val}")
-         st.write(f"**Accuracy on clean:** {acc_clean}")
-         st.write(f"**Accuracy on adversarial:** {acc_adv}")
-         comparephotos(test_adv)
-#add info about the fgsm
-
+# Sidebar information
 st.sidebar.markdown("""
 ### About FGSM Attack
 
@@ -115,7 +175,6 @@ The Fast Gradient Sign Method (FGSM) generates adversarial examples by:
 - **Epsilon (ε)**: Controls perturbation magnitude
 - Larger ε → stronger attack → lower accuracy
 - ε = 0 → no attack (original accuracy)
-
 """)
 
 st.sidebar.markdown("---")
@@ -125,7 +184,7 @@ faq = {
     "What is the purpose of FGSM Attack?": "FGSM generates adversarial examples by adding small, calculated noise to fool the model.",
     "How does the model get affected by epsilon?": "The larger ε is, the stronger the attack, and the lower the accuracy on adversarial examples.",
     "What is the difference between accuracy on clean and adversarial data?": "Accuracy on clean = model performance on original data, accuracy on adversarial = performance after attack.",
-    }
+}
 
 # --- Initialize chat messages ---
 if "messages" not in st.session_state:
@@ -135,18 +194,13 @@ if "messages" not in st.session_state:
 st.sidebar.title("💬 Mini Chatbot")
 
 # Select a question
-selected_q = st.sidebar.selectbox("📋 Choose a question:", ["", *faq.keys()])
+selected_q = st.sidebar.selectbox("📋 Choose a question:", ["Select a question..."] + list(faq.keys()))
 
-if selected_q:
+if st.sidebar.button("Send") and selected_q != "Select a question...":
+    # Add user message
     st.session_state.messages.append({"role": "user", "content": selected_q})
+    # Add assistant response
     st.session_state.messages.append({"role": "assistant", "content": faq[selected_q]})
-
-
-if st.sidebar.button("Send"):
-
-        st.session_state.messages.append({"role": "user", "content": selected_q})
-
-        st.session_state.messages.append({"role": "assistant", "content": faq[selected_q]})
 
 # Display conversation
 for msg in st.session_state.messages:
