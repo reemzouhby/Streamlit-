@@ -159,53 +159,65 @@ def display_results(results):
 # --- Streamlit UI ---
 epsilon = st.slider("Epsilon (Attack Strength)", min_value=0.0, max_value=0.5, step=0.01, value=0.1)
 
+
+
+val = st.slider("Enter epsilon for FGSM ATTACK", min_value=0.0, max_value=2.0, step=0.01,  help="Higher values = stronger attack = lower accuracy")
 if st.button("🚀 Run FGSM Attack", type="primary"):
-    results = run_fgsm_attack(epsilon)
-    if results:
+    with st.spinner("⏳ Running FGSM attack... Please wait"):
+      results = run_fgsm_attack(epsilon)
+      if results:
         st.subheader("Attack Results")
         display_results(results)
 
-# --- Sidebar Info ---
 st.sidebar.markdown("""
 ### About FGSM Attack
-FGSM generates adversarial examples by:
+
+The Fast Gradient Sign Method (FGSM) generates adversarial examples by:
 1. Computing gradients of loss w.r.t. input
-2. Taking the sign of gradients
+2. Taking the sign of gradients  
 3. Adding small perturbation: x' = x + ε × sign(∇loss)
 
 ### Parameters
-- Epsilon (ε): Perturbation magnitude
+- **Epsilon (ε)**: Controls perturbation magnitude
 - Larger ε → stronger attack → lower accuracy
-- ε = 0 → no attack
+- ε = 0 → no attack (original accuracy)
 
-### Model Info
-- CNN with 3 Conv2D layers + 2 Dense layers
-- Trained for 3 epochs on MNIST
-- CPU only
 """)
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("*Built with Streamlit & TensorFlow*")
 
-# --- Mini Chatbot ---
+# --- Project questions with answers ---
 faq = {
     "What is the purpose of FGSM Attack?": "FGSM generates adversarial examples by adding small, calculated noise to fool the model.",
-    "How does the model get affected by epsilon?": "Larger ε = stronger attack = lower accuracy on adversarial examples.",
-    "What is the difference between accuracy on clean and adversarial data?": "Accuracy on clean = original data, accuracy on adversarial = after attack.",
-}
+    "How does the model get affected by epsilon?": "The larger ε is, the stronger the attack, and the lower the accuracy on adversarial examples.",
+    "What is the difference between accuracy on clean and adversarial data?": "Accuracy on clean = model performance on original data, accuracy on adversarial = performance after attack.",
+    }
 
+# --- Initialize chat messages ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# --- Chat interface in sidebar ---
 st.sidebar.title("💬 Mini Chatbot")
+
+# Select a question
 selected_q = st.sidebar.selectbox("📋 Choose a question:", ["", *faq.keys()])
 
-if selected_q and st.sidebar.button("Send"):
-    st.session_state.messages.append({"role":"user","content":selected_q})
-    st.session_state.messages.append({"role":"assistant","content":faq[selected_q]})
+if selected_q:
+    st.session_state.messages.append({"role": "user", "content": selected_q})
+    st.session_state.messages.append({"role": "assistant", "content": faq[selected_q]})
 
+
+if st.sidebar.button("Send"):
+
+        st.session_state.messages.append({"role": "user", "content": selected_q})
+
+        st.session_state.messages.append({"role": "assistant", "content": faq[selected_q]})
+
+# Display conversation
 for msg in st.session_state.messages:
-    if msg["role"]=="user":
+    if msg["role"] == "user":
         st.sidebar.markdown(f"🧑 **You:** {msg['content']}")
     else:
         st.sidebar.markdown(f"🤖 **Bot:** {msg['content']}")
+
