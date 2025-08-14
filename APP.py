@@ -35,17 +35,14 @@ def load_and_preprocess_data():
 def create_model():
     """Create and train CNN model"""
     try:
-      
-            (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
-            
-            # Normalize and reshape
-            train_images = train_images.astype('float32') / 255.0
-            test_images = test_images.astype('float32') / 255.0
-            train_images = train_images.reshape(-1, 28, 28, 1)
-            test_images = test_images.reshape(-1, 28, 28, 1)
+        (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
         
-       
-        
+        # Normalize and reshape
+        train_images = train_images.astype('float32') / 255.0
+        test_images = test_images.astype('float32') / 255.0
+        train_images = train_images.reshape(-1, 28, 28, 1)
+        test_images = test_images.reshape(-1, 28, 28, 1)
+
         # Create model
         model = Sequential([
             Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), padding='same'),
@@ -58,21 +55,25 @@ def create_model():
             Dense(64, activation='relu'),
             Dense(10, activation='softmax')
         ])
-        model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
-              metrics=['accuracy'])
-        history = model.fit(train_images, train_labels,
-                    epochs=3,
-                    batch_size=128,
-                    validation_data=(test_images, test_labels),
-                    verbose=1)
+        
+        model.compile(
+            optimizer='adam',
+            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+            metrics=['accuracy']
+        )
+        
+        history = model.fit(
+            train_images, train_labels,
+            epochs=3,
+            batch_size=128,
+            validation_data=(test_images, test_labels),
+            verbose=1
+        )
 
         # Evaluate model
         test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
-        st.success(f"✅ Model training completed! Test accuracy: {test_acc*100:.2f}%")
-        
         return model
-        
+
     except Exception as e:
         st.error(f"Error creating model: {e}")
         return None
@@ -80,13 +81,8 @@ def create_model():
 # Initialize
 data_load_state = st.text("Loading data and model...")
 test_images, test_labels = load_and_preprocess_data()
-
-
-
 model = create_model()
 classifier = KerasClassifier(model=model, clip_values=(0, 1))
-
-
 def fgsm(epsi):
     # Generate adversarial examples
     attack = FastGradientMethod(estimator=classifier, eps=epsi)
@@ -105,11 +101,6 @@ def comparephotos(x_test_adv):
     # --- Predictions ---
     pred_clean = np.argmax(model.predict(test_images), axis=1)
     pred_adv = np.argmax(model.predict(x_test_adv), axis=1)
-
-    # --- Accuracy counts ---
-    correct_clean = np.sum(pred_clean == test_labels)
-    correct_adv = np.sum(pred_adv == test_labels)
-
 
     # --- Visual comparison ---
     fig, axes = plt.subplots(2, 10, figsize=(15, 4))
