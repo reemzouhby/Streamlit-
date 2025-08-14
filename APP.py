@@ -18,16 +18,79 @@ warnings.filterwarnings('ignore')
 from art.attacks.evasion import FastGradientMethod
 from art.estimators.classification import KerasClassifier
 
-# Load only test data since we're using a pre-trained model
-(_, _), (test_images, test_labels) = mnist.load_data()
 
-# Process only test data (much smaller memory footprint)
-test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+@st.cache_data
+def load_and_preprocess_data():
+    """Load and preprocess MNIST test data"""
+    try:
+        (_, _), (test_images, test_labels) = mnist.load_data()
+        # Normalize and add channel dimension
+        test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+        return test_images, test_labels
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None, None
 
-class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+@st.cache_resource
+def create_model():
+    """Create and train CNN model"""
+    try:
+        with st.spinner("Loading MNIST data..."):
+            # Load data
+            (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
+            
+            # Normalize and reshape
+            train_images = train_images.astype('float32') / 255.0
+            test_images = test_images.astype('float32') / 255.0
+            train_images = train_images.reshape(-1, 28, 28, 1)
+            test_images = test_images.reshape(-1, 28, 28, 1)
+        
+        st.info("Creating and training model...")
+        
+        # Create model
+        model = Sequential([
+            Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), padding='same'),
+            Conv2D(64, (3, 3), activation='relu', padding='same'),
+            MaxPooling2D((2, 2)),
+            Conv2D(64, (3, 3), activation='relu', padding='same'),
+            MaxPooling2D((2, 2)),
+            Flatten(),
+            Dense(128, activation='relu'),
+            Dense(64, activation='relu'),
+            Dense(10, activation='softmax')
+        ])
+        
+     model.compile(optimizer='adam',
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+              metrics=['accuracy'])
+        
+        
+        # Train model
+         history = model.fit(train_images, train_labels,
+                    epochs=10,
+                    batch_size=128,
+                    validation_data=(test_images, test_labels),
+                    verbose=1)
+        
 
-model = tf.keras.models.load_model("mnist_model.h5")
-# Create ART KerasClassifier
+        
+        # Evaluate model
+        test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
+        st.success(f"✅ Model training completed! Test accuracy: {test_acc*100:.2f}%")
+        
+        return model
+        
+    except Exception as e:
+        st.error(f"Error creating model: {e}")
+        return None
+
+# Initialize
+data_load_state = st.text("Loading data and model...")
+test_images, test_labels = load_and_preprocess_data()
+
+
+
+model = create_model()
 classifier = KerasClassifier(model=model, clip_values=(0, 1))
 
 
