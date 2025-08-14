@@ -22,7 +22,7 @@ st.title("Effect of different Epsilon on accuracy of MNIST Dataset")
 
 @st.cache_data
 def load_and_preprocess_data():
-    """Load and preprocess MNIST data"""
+  
     (_, _), (test_images, test_labels) = mnist.load_data()
     # Normalize and add channel dimension
     test_images = test_images.reshape(-1, 28, 28, 1).astype('float32') / 255.0
@@ -30,7 +30,7 @@ def load_and_preprocess_data():
 
 @st.cache_resource
 def create_model():
-    """Create and train a CNN model using your architecture"""
+    
     
     # Load data
     (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
@@ -84,32 +84,6 @@ def create_model():
     test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
     st.success(f"Model training completed! Test accuracy: {test_acc*100:.2f}%")
     
-    # Display training history
-    with st.expander("Training History"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            fig1, ax1 = plt.subplots(figsize=(8, 4))
-            ax1.plot(history.history['accuracy'], label='Training Accuracy')
-            ax1.plot(history.history['val_accuracy'], label='Validation Accuracy')
-            ax1.set_xlabel('Epoch')
-            ax1.set_ylabel('Accuracy')
-            ax1.set_ylim([0.5, 1])
-            ax1.legend()
-            ax1.grid(True, alpha=0.3)
-            st.pyplot(fig1)
-        
-        with col2:
-            fig2, ax2 = plt.subplots(figsize=(8, 4))
-            ax2.plot(history.history['loss'], label='Training Loss')
-            ax2.plot(history.history['val_loss'], label='Validation Loss')
-            ax2.set_xlabel('Epoch')
-            ax2.set_ylabel('Loss')
-            ax2.legend()
-            ax2.grid(True, alpha=0.3)
-            st.pyplot(fig2)
-    
-    return model
 
 # Load data and model
 test_images, test_labels = load_and_preprocess_data()
@@ -164,7 +138,7 @@ if st.button("Run Attack"):
         st.write(f"**Accuracy on adversarial:** {acc_adv:.4f}")
         
         def comparephotos(x_test_adv, test_subset, labels_subset):
-            # --- Predictions on full dataset ---
+     
             st.write("Computing predictions on full dataset...")
             
             # Process predictions in batches
@@ -224,41 +198,7 @@ if st.button("Run Attack"):
             # Show plot in Streamlit
             st.pyplot(fig)
             
-            # Show accuracy by digit
-            st.write("**Accuracy by Digit:**")
-            digit_accuracy_clean = []
-            digit_accuracy_adv = []
-            
-            for digit in range(10):
-                mask = labels_subset == digit
-                if np.sum(mask) > 0:
-                    acc_clean = np.sum(pred_clean[mask] == digit) / np.sum(mask)
-                    acc_adv = np.sum(pred_adv[mask] == digit) / np.sum(mask)
-                    digit_accuracy_clean.append(acc_clean)
-                    digit_accuracy_adv.append(acc_adv)
-                else:
-                    digit_accuracy_clean.append(0)
-                    digit_accuracy_adv.append(0)
-            
-            # Create accuracy comparison chart
-            fig, ax = plt.subplots(figsize=(12, 6))
-            x = np.arange(10)
-            width = 0.35
-            
-            ax.bar(x - width/2, digit_accuracy_clean, width, label='Clean', alpha=0.8)
-            ax.bar(x + width/2, digit_accuracy_adv, width, label='Adversarial', alpha=0.8)
-            
-            ax.set_xlabel('Digit')
-            ax.set_ylabel('Accuracy')
-            ax.set_title('Accuracy by Digit: Clean vs Adversarial')
-            ax.set_xticks(x)
-            ax.set_xticklabels([str(i) for i in range(10)])
-            ax.legend()
-            ax.grid(True, alpha=0.3)
-            
-            plt.tight_layout()
-            st.pyplot(fig)
-
+         
         comparephotos(test_adv, test_subset, labels_subset)
 
 st.sidebar.markdown("""
@@ -281,3 +221,4 @@ This app demonstrates the Fast Gradient Sign Method (FGSM) adversarial attack on
 - Two dense layers (128 and 64 neurons)
 - SparseCategoricalCrossentropy loss (no need to convert labels)
 """)
+
