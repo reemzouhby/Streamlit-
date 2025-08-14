@@ -62,16 +62,12 @@ def create_model():
         model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
               metrics=['accuracy'])
-
-        # Train model
-         history = model.fit(train_images, train_labels,
+        history = model.fit(train_images, train_labels,
                     epochs=10,
                     batch_size=128,
                     validation_data=(test_images, test_labels),
                     verbose=1)
-        
 
-        
         # Evaluate model
         test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
         st.success(f"✅ Model training completed! Test accuracy: {test_acc*100:.2f}%")
