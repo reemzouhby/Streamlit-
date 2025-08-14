@@ -35,8 +35,7 @@ def load_and_preprocess_data():
 def create_model():
     """Create and train CNN model"""
     try:
-        with st.spinner("Loading MNIST data..."):
-            # Load data
+      
             (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
             
             # Normalize and reshape
@@ -45,7 +44,7 @@ def create_model():
             train_images = train_images.reshape(-1, 28, 28, 1)
             test_images = test_images.reshape(-1, 28, 28, 1)
         
-        st.info("Creating and training model...")
+       
         
         # Create model
         model = Sequential([
@@ -63,7 +62,7 @@ def create_model():
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
               metrics=['accuracy'])
         history = model.fit(train_images, train_labels,
-                    epochs=10,
+                    epochs=3,
                     batch_size=128,
                     validation_data=(test_images, test_labels),
                     verbose=1)
