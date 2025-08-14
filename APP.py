@@ -108,7 +108,7 @@ def run_fgsm_attack(epsilon):
         with st.spinner("Generating adversarial examples..."):
             x_test_adv = attack.generate(x=test_subset)
 
-        pred_clean = np.argmax(model.predict(text_images, verbose=0), axis=1)
+        pred_clean = np.argmax(model.predict(test_images, verbose=0), axis=1)
         pred_adv = np.argmax(model.predict(x_test_adv, verbose=0), axis=1)
 
         acc_clean = np.mean(pred_clean ==  test_labels)
