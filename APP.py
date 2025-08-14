@@ -156,9 +156,6 @@ def display_results(results):
     except Exception as e:
         st.error(f"Error creating visualization: {e}")
 
-# --- Streamlit UI ---
-epsilon = st.slider("Epsilon (Attack Strength)", min_value=0.0, max_value=0.5, step=0.01, value=0.1)
-
 
 
 val = st.slider("Enter epsilon for FGSM ATTACK", min_value=0.0, max_value=2.0, step=0.01,  help="Higher values = stronger attack = lower accuracy")
