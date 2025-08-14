@@ -59,12 +59,10 @@ def create_model():
             Dense(64, activation='relu'),
             Dense(10, activation='softmax')
         ])
-        
-     model.compile(optimizer='adam',
+        model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
               metrics=['accuracy'])
-        
-        
+
         # Train model
          history = model.fit(train_images, train_labels,
                     epochs=10,
