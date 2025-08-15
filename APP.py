@@ -36,9 +36,7 @@ def fgsm(epsi,subset_size=1000):
             indices = np.random.choice(len(test_images), subset_size, replace=False)
             images_to_use = test_images[indices]
             labels_to_use = test_labels[indices]
-            st.info(f"Using {subset_size} random samples from {len(test_images)} total images")
-
-
+         
             # Generate adversarial examples
             attack = FastGradientMethod(estimator=classifier, eps=epsi)
             x_test_adv = attack.generate(x=images_to_use)
