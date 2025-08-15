@@ -69,7 +69,7 @@ def create_model():
 
         # Train model
         model.fit(train_images, train_labels,
-                  epochs=10,
+                  epochs=6,
                   batch_size=128,
                   validation_data=(test_images, test_labels),
                   verbose=0)
