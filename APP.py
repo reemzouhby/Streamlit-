@@ -154,8 +154,13 @@ if st.sidebar.button("Send"):
         st.session_state.messages.append({"role": "assistant", "content": faq[selected_q]})
 
 # Display conversation
-for msg in st.session_state.messages:
+for msg in st.session_state.messages[-6:]:  # Show only last 6 messages to save space
     if msg["role"] == "user":
         st.sidebar.markdown(f"🧑 **You:** {msg['content']}")
     else:
         st.sidebar.markdown(f"🤖 **Bot:** {msg['content']}")
+
+# Clear chat button
+if st.session_state.messages and st.sidebar.button("Clear Chat"):
+    st.session_state.messages = []
+    st.experimental_rerun()
